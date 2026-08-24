@@ -76,6 +76,9 @@ class InterpreterState(
     var expansionStderr: String? = null,
     var extraArgs: List<String>? = null,
     var hashTable: MutableMap<String, String>? = null,
+    var directoryStack: MutableList<String>? = null,
+    var completions: MutableMap<String, String> = LinkedHashMap(),
+    var completionOptions: MutableMap<String, MutableSet<String>> = LinkedHashMap(),
 ) {
     fun cloneBasics(): InterpreterState {
         val s = InterpreterState(

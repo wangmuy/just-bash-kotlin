@@ -1,6 +1,10 @@
 package com.justbash.cli
 
 import com.justbash.BashEnvironment
+import com.justbash.fs.InMemoryFs
+import com.justbash.fs.mountable.MountConfig
+import com.justbash.fs.mountable.MountableFs
+import com.justbash.fs.mountable.MountableFsOptions
 import com.justbash.fs.overlay.OverlayFs
 import com.justbash.fs.overlay.OverlayFsOptions
 import com.justbash.fs.readwrite.ReadWriteFs
@@ -26,17 +30,39 @@ class VirtualShell(
     private val network: Boolean = false,
     /** Use ReadWriteFs (writes to real disk) instead of OverlayFs (copy-on-write). */
     private val readWrite: Boolean = false,
+    /**
+     * Mount specifications for MountableFs, in the form "VPATH=REALPATH,...".
+     * When non-empty, uses MountableFs with InMemoryFs base and each VPATH
+     * mounted to a ReadWriteFs rooted at REALPATH.
+     */
+    private val mountable: String? = null,
 ) {
-    private val fs = if (readWrite) {
-        ReadWriteFs(ReadWriteFsOptions(root = root))
-    } else {
-        OverlayFs(
+    private val fs = when {
+        mountable != null -> buildMountableFs(mountable)
+        readWrite -> ReadWriteFs(ReadWriteFsOptions(root = root))
+        else -> OverlayFs(
             OverlayFsOptions(
                 root = root,
                 mountPoint = mountPoint,
                 readOnly = false,
             )
         )
+    }
+
+    /** Build a MountableFs from "VPATH=REALPATH,..." specs. */
+    private fun buildMountableFs(spec: String): com.justbash.fs.IFileSystem {
+        val mounts = spec.split(",")
+            .filter { it.isNotBlank() }
+            .map { entry ->
+                val eq = entry.indexOf('=')
+                if (eq <= 0) {
+                    throw IllegalArgumentException("Invalid --mountable spec '$entry': expected VPATH=REALPATH")
+                }
+                val vpath = entry.substring(0, eq).trim()
+                val realPath = entry.substring(eq + 1).trim()
+                MountConfig(vpath, ReadWriteFs(ReadWriteFsOptions(root = realPath)))
+            }
+        return MountableFs(MountableFsOptions(base = InMemoryFs(), mounts = mounts))
     }
 
     private val bash = BashEnvironment(

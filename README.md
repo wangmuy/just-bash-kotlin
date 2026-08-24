@@ -33,12 +33,13 @@ echo 'echo hello' | java -jar build/libs/just-bash-kotlin-0.1.0.jar
 java -jar build/libs/just-bash-kotlin-0.1.0.jar script.sh
 ```
 
-### 交互式 REPL（OverlayFs / ReadWriteFs）
+### 交互式 REPL（OverlayFs / ReadWriteFs / MountableFs）
 
-REPL 支持两种文件系统后端：
+REPL 支持三种文件系统后端：
 
 - **OverlayFs**（默认）：**读**真实文件系统，**写**内存层（copy-on-write），不触及磁盘 —— 适合安全沙箱
 - **ReadWriteFs**（`--readwrite`）：直接**读写**真实磁盘 —— 适合需要持久化写操作的场景
+- **MountableFs**（`--mountable`）：多挂载点，将多个真实目录挂载到不同虚拟路径
 
 #### OverlayFs REPL（写内存层，不触磁盘）
 
@@ -106,14 +107,41 @@ result.txt
 user@virtual:~$ exit
 ```
 
-**两种模式对比：**
+#### MountableFs REPL（多挂载点）
 
-| 特性 | OverlayFs（默认） | ReadWriteFs（`--readwrite`） |
-|------|------------------|---------------------------|
-| 读操作 | 真实文件系统 | 真实文件系统 |
-| 写操作 | 内存层（copy-on-write） | 真实磁盘 |
-| 持久化 | 否（退出后丢失） | 是 |
-| 适用场景 | 安全沙箱、试运行 | 实际文件操作 |
+```bash
+# 将多个真实目录挂载到不同虚拟路径
+java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell \
+    --mountable "/mnt/data=./data,/mnt/logs=./logs"
+
+# 每个挂载点使用 ReadWriteFs（写直接触及真实磁盘）
+# 未挂载的路径使用 InMemoryFs（内存）
+```
+
+**MountableFs REPL 示例：**
+
+```bash
+$ java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell --mountable "/mnt/data=./data"
+
+user@virtual:~$ cat /mnt/data/file.txt        # 读真实磁盘
+hello from data
+
+user@virtual:~$ echo "new" > /mnt/data/out.txt  # 写真实磁盘
+user@virtual:~$ cat /mnt/data/out.txt
+new
+
+user@virtual:~$ echo "volatile" > /tmp/volatile.txt  # /tmp 未挂载 → 内存
+user@virtual:~$ exit
+```
+
+**三种模式对比：**
+
+| 特性 | OverlayFs（默认） | ReadWriteFs（`--readwrite`） | MountableFs（`--mountable`） |
+|------|------------------|---------------------------|---------------------------|
+| 读操作 | 真实文件系统 | 真实文件系统 | 挂载路径：真实磁盘；未挂载：内存 |
+| 写操作 | 内存层（copy-on-write） | 真实磁盘 | 挂载路径：真实磁盘；未挂载：内存 |
+| 持久化 | 否（退出后丢失） | 是 | 挂载路径：是；未挂载：否 |
+| 适用场景 | 安全沙箱、试运行 | 实际文件操作 | 多目录隔离、混合读写 |
 
 ## 目录结构
 

@@ -11,6 +11,19 @@ object EchoCommand : Command {
     override val name = "echo"
 
     override suspend fun execute(args: List<String>, ctx: CommandContext): ExecResult {
+        if (hasHelpFlag(args)) {
+            return showHelp(
+                "echo", "display a line of text",
+                "echo [OPTION]... [STRING]...",
+                listOf(
+                    "-n     do not output the trailing newline",
+                    "-e     enable interpretation of backslash escapes",
+                    "-E     disable interpretation of backslash escapes (default)",
+                    "    --help     display this help and exit",
+                ),
+            )
+        }
+
         var noNewline = false
         var interpretEscapes = ctx.xpgEcho
         var startIndex = 0

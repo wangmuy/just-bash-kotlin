@@ -30,6 +30,7 @@ object JustBashCli {
         var version: Boolean = false,
         var shell: Boolean = false,
         var readWrite: Boolean = false,
+        var mountable: String? = null,
         var root: String = ".",
         var files: Map<String, String> = emptyMap(),
     )
@@ -48,6 +49,7 @@ Options:
   --json            Output results as JSON (stdout, stderr, exitCode)
   --shell           Start interactive REPL shell (reads real FS, writes in-memory)
   --readwrite        Use ReadWriteFs (writes to real disk) instead of OverlayFs
+  --mountable SPEC   MountableFs: VPATH=REALPATH,... (e.g. /mnt/data=./data)
   --root <path>     Root directory (accepted for compat; InMemoryFs ignores it)
   --file <path>=<vpath>  Mount a real file/dir into the virtual filesystem
   -h, --help        Show this help message
@@ -88,6 +90,12 @@ Examples:
                 arg == "--json" -> { options.json = true; i++ }
                 arg == "--shell" -> { options.shell = true; i++ }
                 arg == "--readwrite" -> { options.readWrite = true; i++ }
+                arg == "--mountable" -> {
+                    if (i + 1 >= args.size) {
+                        System.err.println("Error: --mountable requires a spec argument"); exit(1)
+                    }
+                    options.mountable = args[i + 1]; i += 2
+                }
                 arg == "--root" -> {
                     if (i + 1 >= args.size) {
                         System.err.println("Error: --root requires a path argument"); exit(1)
@@ -164,6 +172,7 @@ Examples:
                 root = options.root,
                 files = options.files,
                 readWrite = options.readWrite,
+                mountable = options.mountable,
             ).run()
             return 0
         }

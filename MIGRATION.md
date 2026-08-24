@@ -8,7 +8,7 @@
 - **移植版本**: just-bash-kotlin v0.1.0
 - **移植范围**: 核心 bash 模拟器 + 常用 coreutils 命令
 - **测试策略**: 为每个移植模块编写 Kotlin JUnit 5 单元测试
-- **测试结果**: 624 个测试，0 失败，0 错误（BUILD SUCCESS）
+- **测试结果**: 737 个测试，0 失败，0 错误（BUILD SUCCESS）
 
 ## 架构映射
 
@@ -101,6 +101,15 @@ src/commands/**/*.ts            →  com.justbash.commands.*
 - ✅ let
 - ✅ set
 - ✅ declare
+- ✅ help (分类命令列表 + `<command> --help` 委托)
+- ✅ shopt (含 -s/-u/-p/-q/-o；所有 11 个 shell 选项)
+- ✅ dirs (含 -c/-l/-p/-v/+N/-N；目录栈)
+- ✅ complete (含 -W/-r/-p；补全设定)
+- ✅ compgen (含 -v/-e/-f/-d/-k/-A/-W/-P/-S；补全生成)
+- ✅ compopt (含 -o/+o；补全选项)
+- ✅ getopts (含 OPTIND/OPTARG/`:` 静默模式)
+- ✅ hash (含 -r/-d/-t/-p/-l；命令路径缓存)
+- ✅ mapfile (含 -d/-n/-O/-s/-t/-u/-C/-c；读取到数组)
 
 ### 外部命令 (coreutils)
 - ✅ echo (含 -n, -e, -E, \xNN, \uXXXX)
@@ -138,7 +147,33 @@ src/commands/**/*.ts            →  com.justbash.commands.*
 - ✅ yq (含 -p/-o/-r/-c/-I；SnakeYAML)
 - ✅ timeout (含 s/m/h/d 后缀；`withTimeout` 真正超时取消，对齐原版 `AbortController`/`AbortSignal`)
 - ✅ rg (ripgrep，含 gitignore/文件类型/智能大小写/递归搜索)
-- ✅ xan (CSV 工具，含 15 核心子命令：cat/count/head/tail/select/filter/map/sort/dedup/stats/frequency/agg/rename/search/view)
+- ✅ bash, sh (含 -c、脚本文件；`ctx.exec` 代理)
+- ✅ split (含 -l/-b/-n/-a/-d/--additional-suffix)
+- ✅ tee (含 -a；stdin 分流到文件和 stdout)
+- ✅ time (含 -f/-o/-a/-v/-p；`System.currentTimeMillis` 计时)
+- ✅ tree (含 -L/-a/-d/-f；递归目录树)
+- ✅ which (含 -a/-s；PATH 查找)
+- ✅ whoami (`System.getProperty("user.name")`)
+- ✅ xargs (含 -I/-d/-n/-0/-t/-r；`ctx.exec` 代理)
+- ✅ html-to-markdown (正则 HTML→Markdown 转换)
+- ✅ alias (含 unalias -a；存储到 `BASH_ALIAS_<name>`)
+- ✅ clear (ANSI 清屏)
+- ✅ cut (含 -d/-f/-c/-s)
+- ✅ du (含 -s/-h/-a/-c/--max-depth)
+- ✅ expand (含 -t/-i；制表符→空格)
+- ✅ fold (含 -w/-s/-b；文本折行)
+- ✅ history (含 -c；读取 `BASH_HISTORY`)
+- ✅ hostname (`InetAddress.getLocalHost`)
+- ✅ nl (含 -b/-n/-w/-s/-v/-i；行号输出)
+- ✅ column (含 -t/-s/-o/-c/-n)
+- ✅ comm (含 -1/-2/-3)
+- ✅ file (含 magic byte 检测)
+- ✅ join (含 -1/-2/-t/-a/-v/-o/-i)
+- ✅ od (含 -A/-t/-N；八进制/十六进制 dump)
+- ✅ paste (含 -d/-s)
+- ✅ rev (字符反转)
+- ✅ strings (含 -n/-t/-e)
+- ✅ tac (行反转)
 
 ## 未移植的模块
 
@@ -198,10 +233,6 @@ src/commands/**/*.ts            →  com.justbash.commands.*
 ### 其他
 | 模块 | 原因 |
 |------|------|
-| `custom-commands` | ✅ 已移植（`com.justbash.CustomCommands`：`defineCommand` + `LazyCommand`） |
-| `network/SecureFetch` | ✅ 已移植（`com.justbash.network.SecureFetch`：JDK `HttpClient` + URL 白名单 + 响应大小限制 + 超时 + 重定向控制） |
-| `transform/*` | ✅ 已移植（`com.justbash.transform.Serializer` + `TransformPipeline` + `CommandCollectorPlugin` + `TeePlugin`） |
-| `OverlayFs` | ✅ 已移植（`com.justbash.fs.overlay.OverlayFs`，copy-on-write，read-only/read-write 模式） |
 | `browser.ts` | 浏览器打包 —— JVM 环境不需要 |
 | `sandbox/Sandbox` | Vercel 沙箱 API —— 依赖网络/进程隔离，不可移植 |
 | `network/dns-pin` | DNS 绑定防范 —— 需要 native DNS 能力，`InMemoryFs` 环境无 DNS 重绑定风险，跳过 |
@@ -217,13 +248,17 @@ src/commands/**/*.ts            →  com.justbash.commands.*
   `-h/--help`、`-v/--version`、脚本文件、stdin 管道。
 - 已验证：echo、for 循环、stdin、脚本文件、errexit、JSON 输出、版本、帮助、REPL 非交互逐行执行。
 
-### 说明：OverlayFs 已移植
-- ✅ `com.justbash.fs.overlay.OverlayFs` — copy-on-write 文件系统
-  - **readOnly=true**：所有写操作抛 `EROFS`（只读）
-  - **readOnly=false**（默认）：允许写操作，但**写入内存层**（`memory` map），**不触及真实磁盘**
-  - 读操作：先查内存层，未命中则 fallback 到真实文件系统
-- 通过 `OverlayFs(OverlayFsOptions(root, mountPoint, readOnly))` 挂载真实磁盘目录到虚拟文件系统
-- 安全特性：symlink 检测（默认拒绝）、路径遍历防护、内存层隔离
+### 说明：文件系统实现
+
+| FS 实现 | 读操作 | 写操作 | 持久化 | 用途 |
+|---------|--------|--------|--------|------|
+| `InMemoryFs` | 内存 | 内存 | 否 | 默认（纯内存虚拟 FS） |
+| `OverlayFs` | 真实磁盘 | 内存层（copy-on-write） | 否 | 安全沙箱 |
+| `ReadWriteFs` | 真实磁盘 | 真实磁盘 | 是 | 需要持久化写入 |
+| `MountableFs` | 取决于挂载的后端 | 取决于挂载的后端 | 取决于挂载的后端 | 组合多个 FS 后端 |
+
+- ✅ 通过 `BashEnvironment(fsOverride = ...)` 注入任意 `IFileSystem` 实现
+- ✅ REPL 支持三种模式：`--shell`（OverlayFs）、`--shell --readwrite`（ReadWriteFs）、`--shell --mountable VPATH=REALPATH,...`（MountableFs）
 
 ## 关键差异
 

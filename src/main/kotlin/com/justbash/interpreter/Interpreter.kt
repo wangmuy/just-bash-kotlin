@@ -194,7 +194,12 @@ class Interpreter(
                     ctx.state.cwd = opts.cwd
                 }
                 try {
-                    val result = this.execString(cmd)
+                    val fullCmd = if (opts.args?.isNotEmpty() == true) {
+                        "$cmd ${opts.args.joinToString(" ")}"
+                    } else {
+                        cmd
+                    }
+                    val result = this.execString(fullCmd)
                     result
                 } finally {
                     ctx.state.cwd = savedCwd
@@ -228,6 +233,14 @@ class Interpreter(
         "exec" -> Builtins.exec(ctx, args)
         "wait" -> Result.ok()
         "type" -> Result.ok()
+        "shopt" -> MoreBuiltins.shopt(ctx, args)
+        "dirs" -> MoreBuiltins.dirs(ctx, args)
+        "complete" -> MoreBuiltins.complete(ctx, args)
+        "compgen" -> MoreBuiltins.compgen(ctx, args)
+        "compopt" -> MoreBuiltins.compopt(ctx, args)
+        "getopts" -> MoreBuiltins2.getopts(ctx, args)
+        "hash" -> MoreBuiltins2.hash(ctx, args)
+        "mapfile" -> MoreBuiltins2.mapfile(ctx, args, stdin.toString(Charsets.UTF_8))
         "test", "[" -> {
             val testArgs = if (commandName == "[") { if (args.lastOrNull() == "]") args.dropLast(1) else args } else args
             Builtins.test(ctx, testArgs)

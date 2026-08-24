@@ -414,5 +414,5 @@ object Builtins {
         return result
     }
 
-    val BASIC_BUILTINS = setOf("echo", "cd", "export", "local", "read", "exit", "return", "unset", "shift", "eval", "source", ".", "break", "continue", "let", "set", "declare", "typeset", "readonly", ":", "true", "false", "command", "builtin", "exec", "wait", "type", "test", "[")
+    val BASIC_BUILTINS = setOf("echo", "cd", "export", "local", "read", "exit", "return", "unset", "shift", "eval", "source", ".", "break", "continue", "let", "set", "declare", "typeset", "readonly", ":", "true", "false", "command", "builtin", "exec", "wait", "type", "test", "[", "shopt", "dirs", "complete", "compgen", "compopt", "getopts", "hash", "mapfile")
 }
