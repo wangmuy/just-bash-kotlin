@@ -1,0 +1,3 @@
+package com.justbash.interpreter.expansion
+
+fun getVariableAttributes(ctx: ExpansionContext, name: String): String { if (!name.matches(Regex("^[a-zA-Z_][a-zA-Z0-9_]*$"))) return ""; var attrs = ""; val isIndexed = ctx.state.arrays[name]?.kind == "indexed"; val isAssoc = ctx.state.associativeArrays.contains(name); if (isIndexed && !isAssoc) attrs += "a"; if (isAssoc) attrs += "A"; if (ctx.state.integerVars.contains(name)) attrs += "i"; if (ctx.state.namerefs.contains(name)) attrs += "n"; if (ctx.state.readonlyVars.contains(name)) attrs += "r"; if (ctx.state.exportedVars.contains(name)) attrs += "x"; return attrs }

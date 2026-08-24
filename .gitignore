@@ -1,0 +1,10 @@
+target/
+build/
+.gradle/
+bin/
+usr/
+fakeroot/
+*.class
+*.jar
+.idea/
+*.iml

@@ -1,0 +1,49 @@
+package com.justbash.interpreter.expansion
+
+import com.justbash.ast.*
+
+fun parseArithNumber(str: String): Double? {
+    var s = str.trim(); if (s.isEmpty()) return null
+    var sign = 1.0; if (s.startsWith("-")) { sign = -1.0; s = s.substring(1) } else if (s.startsWith("+")) { s = s.substring(1) }
+    val bi = s.indexOf('#'); if (bi >= 0) { val bs = s.substring(0, bi); val dg = s.substring(bi + 1); val base = bs.toIntOrNull() ?: return null; if (base < 2 || base > 64) return null; var acc = 0.0; for (ch in dg) { val d = digitValue(ch); if (d < 0 || d >= base) return null; acc = acc * base + d }; return sign * acc }
+    var value = 0.0; if (s.startsWith("0x") || s.startsWith("0X")) { val hex = s.substring(2); if (hex.isEmpty()) return null; for (ch in hex) { val d = hexValue(ch); if (d < 0) return null; value = value * 16 + d }; return sign * value }
+    if (s.length > 1 && s.startsWith("0")) { val oct = s.substring(1); for (ch in oct) { val d = digitValue(ch); if (d < 0 || d >= 8) return null; value = value * 8 + d }; return sign * value }
+    val dec = s.toDoubleOrNull() ?: return null; return sign * dec
+}
+private fun digitValue(ch: Char): Int = when (ch) { in '0'..'9' -> ch - '0'; in 'a'..'z' -> ch - 'a' + 10; in 'A'..'Z' -> ch - 'A' + 10; else -> -1 }
+private fun hexValue(ch: Char): Int = when (ch) { in '0'..'9' -> ch - '0'; in 'a'..'f' -> ch - 'a' + 10; in 'A'..'F' -> ch - 'A' + 10; else -> -1 }
+private fun toInt32(x: Double): Int = x.toInt()
+private fun jsAnd(a: Double, b: Double): Double = (toInt32(a) and toInt32(b)).toDouble()
+private fun jsOr(a: Double, b: Double): Double = (toInt32(a) or toInt32(b)).toDouble()
+private fun jsXor(a: Double, b: Double): Double = (toInt32(a) xor toInt32(b)).toDouble()
+private fun jsShl(a: Double, b: Double): Double = (toInt32(a) shl (toInt32(b) and 31)).toDouble()
+private fun jsShr(a: Double, b: Double): Double = (toInt32(a) shr (toInt32(b) and 31)).toDouble()
+private fun jsNot(a: Double): Double = toInt32(a).inv().toDouble()
+internal fun formatArith(value: Double): Long { if (value.isNaN() || value.isInfinite()) return 0; return if (value >= 0) Math.floor(value).toLong() else Math.ceil(value).toLong() }
+private class Arc { val visited = LinkedHashSet<String>(); var depth = 0 }
+private fun applyBinaryOp(left: Double, right: Double, op: String): Double = when (op) { "+" -> left + right; "-" -> left - right; "*" -> left * right; "/" -> { if (right == 0.0) throw ArithmeticError("division by 0"); Math.floor(left / right) }; "%" -> { if (right == 0.0) throw ArithmeticError("division by 0"); left % right }; "**" -> { if (right < 0) throw ArithmeticError("exponent less than 0"); Math.pow(left, right) }; "<<" -> jsShl(left, right); ">>" -> jsShr(left, right); "<" -> if (left < right) 1.0 else 0.0; "<=" -> if (left <= right) 1.0 else 0.0; ">" -> if (left > right) 1.0 else 0.0; ">=" -> if (left >= right) 1.0 else 0.0; "==" -> if (left == right) 1.0 else 0.0; "!=" -> if (left != right) 1.0 else 0.0; "&" -> jsAnd(left, right); "|" -> jsOr(left, right); "^" -> jsXor(left, right); "," -> right; else -> 0.0 }
+private fun applyAssignOp(cur: Double, v: Double, op: String): Double = when (op) { "=" -> v; "+=" -> cur + v; "-=" -> cur - v; "*=" -> cur * v; "/=" -> if (v != 0.0) Math.floor(cur / v) else 0.0; "%=" -> if (v != 0.0) cur % v else 0.0; "<<=" -> jsShl(cur, v); ">>=" -> jsShr(cur, v); "&=" -> jsAnd(cur, v); "|=" -> jsOr(cur, v); "^=" -> jsXor(cur, v); else -> v }
+private fun applyUnaryOp(operand: Double, op: String): Double = when (op) { "-" -> -operand; "+" -> operand; "!" -> if (operand == 0.0) 1.0 else 0.0; "~" -> jsNot(operand); else -> operand }
+fun evaluateArithmetic(ctx: ExpansionContext, expr: ArithExpr, isExpansionContext: Boolean = false): Double = evaluateArithmeticInternal(ctx, expr, isExpansionContext, Arc())
+private fun evaluateArithmeticInternal(ctx: ExpansionContext, expr: ArithExpr, isExpansionContext: Boolean, res: Arc): Double {
+    fun ev(nested: ArithExpr, expansion: Boolean = isExpansionContext): Double = evaluateArithmeticInternal(ctx, nested, expansion, res)
+    when (expr) {
+        is ArithNumberNode -> { val v = expr.value.toDouble(); if (v.isNaN()) throw ArithmeticError("value too great for base"); return v }
+        is ArithVariableNode -> return resolveArithVariable(ctx, expr.name, res)
+        is ArithSpecialVarNode -> { val value = getVariable(ctx, expr.name).trim(); if (value.isEmpty()) return 0.0; val num = value.toDoubleOrNull(); if (num != null && value.matches(Regex("^-?\\d+$"))) return num; return evaluateArithValue(ctx, value, res) }
+        is ArithNestedNode -> return ev(expr.expression)
+        is ArithCommandSubstNode -> { val r = ctx.execFn(expr.command); if (r.stderr.isNotEmpty()) ctx.state.expansionStderr += r.stderr; return r.stdout.trim().toDoubleOrNull() ?: 0.0 }
+        is ArithBinaryNode -> { if (expr.operator == "||") { val l = ev(expr.left); return if (l != 0.0) 1.0 else if (ev(expr.right) != 0.0) 1.0 else 0.0 }; if (expr.operator == "&&") { val l = ev(expr.left); return if (l == 0.0) 0.0 else if (ev(expr.right) != 0.0) 1.0 else 0.0 }; return applyBinaryOp(ev(expr.left), ev(expr.right), expr.operator) }
+        is ArithUnaryNode -> { val operand = ev(expr.operand); if (expr.operator == "++" || expr.operator == "--") { val nv = if (expr.operator == "++") operand + 1 else operand - 1; val op = expr.operand; if (op is ArithVariableNode) { ctx.state.env[op.name] = formatArith(nv).toString(); return if (expr.prefix) nv else operand }; return operand }; return applyUnaryOp(operand, expr.operator) }
+        is ArithTernaryNode -> return if (ev(expr.condition) != 0.0) ev(expr.consequent) else ev(expr.alternate)
+        is ArithAssignmentNode -> { val name = expr.variable; var ak: String? = null; if (expr.stringKey != null) ak = expr.stringKey; else if (expr.subscript != null) { ak = formatArith(ev(expr.subscript, false)).toString() }; val cv = if (ak == null) ctx.state.env[name] else getArrayElement(ctx, name, ak); val cur = cv?.toDoubleOrNull() ?: 0.0; val v = ev(expr.value, false); val nv = applyAssignOp(cur, v, expr.operator); if (ak == null) ctx.state.env[name] = formatArith(nv).toString() else setArrayElement(ctx, name, ak, formatArith(nv).toString()); return nv }
+        is ArithGroupNode -> return ev(expr.expression)
+        is ArithConcatNode -> { var c = ""; for (p in expr.parts) c += evalConcat(ctx, p, isExpansionContext, res); if (c.matches(Regex("^[a-zA-Z_][a-zA-Z0-9_]*$"))) return resolveArithVariable(ctx, c, res); return c.toDoubleOrNull() ?: 0.0 }
+        else -> return 0.0
+    }
+}
+private fun evaluateArithValue(ctx: ExpansionContext, value: String, res: Arc): Double { if (value.isEmpty()) return 0.0; val t = value.trim(); val num = t.toDoubleOrNull(); if (num != null && t.matches(Regex("^-?\\d+$"))) return num; parseArithNumber(t)?.let { return it }; throw ArithmeticError("$t: syntax error in expression") }
+private fun getArithVariable(ctx: ExpansionContext, name: String): String { ctx.state.env[name]?.let { return it }; getArrayElement(ctx, name, 0)?.let { return it }; return getVariable(ctx, name) }
+private fun resolveArithVariable(ctx: ExpansionContext, name: String, res: Arc): Double { if (res.depth > 100) throw ArithmeticError("maximum variable indirection depth exceeded"); if (!res.visited.add(name)) throw ArithmeticError("arithmetic variable cycle detected at $name"); res.depth++; try { val value = getArithVariable(ctx, name); if (value.isEmpty()) return 0.0; val num = value.trim().toDoubleOrNull(); if (num != null && value.trim().matches(Regex("^-?\\d+$"))) return num; val t = value.trim(); if (t.matches(Regex("^[a-zA-Z_][a-zA-Z0-9_]*$"))) return resolveArithVariable(ctx, t, res); return evaluateArithValue(ctx, t, res) } finally { res.depth--; res.visited.remove(name) } }
+private fun evalConcat(ctx: ExpansionContext, expr: ArithExpr, isExpansionContext: Boolean, res: Arc): String = when (expr) { is ArithNumberNode -> expr.value.toString(); is ArithVariableNode -> if (expr.hasDollarPrefix) getVariable(ctx, expr.name) else expr.name; is ArithSpecialVarNode -> getVariable(ctx, expr.name); is ArithBracedExpansionNode -> expandBracedContent(ctx, expr.content); is ArithCommandSubstNode -> ctx.execFn(expr.command).stdout.trim(); is ArithConcatNode -> { val sb = StringBuilder(); for (p in expr.parts) sb.append(evalConcat(ctx, p, isExpansionContext, res)); sb.toString() }; else -> evaluateArithmeticInternal(ctx, expr, isExpansionContext, res).let { formatArith(it).toString() } }
+private fun expandBracedContent(ctx: ExpansionContext, content: String): String { if (content.startsWith("#")) { val vn = content.substring(1); val am = Regex("^([a-zA-Z_][a-zA-Z0-9_]*)\\[[@*]\\]$").find(vn); if (am != null) return getArrayElements(ctx, am.groupValues[1]).size.toString(); return (ctx.state.env[vn] ?: "").length.toString() }; if (content.startsWith("!")) { val vn = content.substring(1); val ind = ctx.state.env[vn] ?: ""; return ctx.state.env[ind] ?: "" }; val ops = listOf(":-", ":=", ":?", ":+", "-", "=", "?", "+"); var oi = -1; var op = ""; for (o in ops) { val idx = content.indexOf(o); if (idx > 0 && (oi == -1 || idx < oi)) { oi = idx; op = o } }; if (oi == -1) return getVariable(ctx, content); val vn = content.substring(0, oi); val dv = content.substring(oi + op.length); val value = ctx.state.env[vn]; val unset = value == null; val empty = value == ""; val checkEmpty = op.startsWith(":"); return when (op) { ":-", "-" -> if (unset || (checkEmpty && empty)) dv else value ?: ""; ":=", "=" -> if (unset || (checkEmpty && empty)) { ctx.state.env[vn] = dv; dv } else value ?: ""; ":+", "+" -> if (!(unset || (checkEmpty && empty))) dv else ""; ":?", "?" -> if (unset || (checkEmpty && empty)) throw RuntimeException(dv.ifEmpty { "$vn: parameter null or not set" }) else value ?: ""; else -> value ?: "" } }
