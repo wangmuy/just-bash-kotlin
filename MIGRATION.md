@@ -1,19 +1,21 @@
-# just-bash-kotlin 移植情况报告
+# just-bash-kotlin Porting Report
 
-## 概述
+English | [中文](MIGRATION.zh.md)
 
-本项目将 [just-bash](https://github.com/vercel-labs/just-bash)（TypeScript）的核心功能移植为 Kotlin（JVM 17）。
+## Overview
 
-- **原始版本**: just-bash v3.4.1
-- **移植版本**: just-bash-kotlin v0.1.0
-- **移植范围**: 核心 bash 模拟器 + 常用 coreutils 命令
-- **测试策略**: 为每个移植模块编写 Kotlin JUnit 5 单元测试
-- **测试结果**: 737 个测试，0 失败，0 错误（BUILD SUCCESS）
+This project ports the core functionality of [just-bash](https://github.com/vercel-labs/just-bash) (TypeScript) to Kotlin (JVM 17).
 
-## 架构映射
+- **Original version**: just-bash v3.4.1
+- **Ported version**: just-bash-kotlin v0.1.0
+- **Porting scope**: core bash emulator + common coreutils commands
+- **Testing strategy**: Kotlin JUnit 5 unit tests for each ported module
+- **Test results**: 737 tests, 0 failures, 0 errors (BUILD SUCCESS)
+
+## Architecture Mapping
 
 ```
-原始 TS 模块                     →  Kotlin 模块
+Original TS module                →  Kotlin module
 ──────────────────────────────────────────────────
 src/ast/types.ts                →  com.justbash.ast.Ast
 src/types.ts                    →  com.justbash.Types
@@ -22,7 +24,7 @@ src/fs/interface.ts             →  com.justbash.fs.IFileSystem
 src/fs/in-memory-fs/*.ts        →  com.justbash.fs.InMemoryFs
 src/fs/path-utils.ts            →  com.justbash.fs.PathUtils
 src/fs/init.ts                  →  com.justbash.fs.FsInit
-src/fs/encoding.ts              →  (内联到 InMemoryFs)
+src/fs/encoding.ts              →  (inlined into InMemoryFs)
 src/shell-metadata.ts           →  com.justbash.ShellMetadata
 src/parser/*.ts                 →  com.justbash.parser.*
 src/interpreter/expansion/*.ts  →  com.justbash.interpreter.expansion.*
@@ -31,69 +33,69 @@ src/Bash.ts                     →  com.justbash.BashEnvironment
 src/commands/**/*.ts            →  com.justbash.commands.*
 ```
 
-## 已移植模块
+## Ported Modules
 
-### 基础模块
-- ✅ 编码/字节边界助手 (`Encoding.kt`)
-- ✅ 路径工具 (`PathUtils.kt`)
-- ✅ 虚拟文件系统接口 (`IFileSystem.kt`)
-- ✅ 内存文件系统 (`InMemoryFs.kt`) — 完整移植，含 symlink、hard link、配额
-- ✅ 文件系统初始化 (`FsInit.kt`) — /dev, /proc, /bin 等
-- ✅ 错误信息脱敏 (`SanitizeError.kt`) — 替换真实路径为 `<path>`
-- ✅ 真实文件系统读写 (`readwrite/ReadWriteFs.kt`) — 直写真实磁盘，含 symlink 安全检测
-- ✅ 覆盖文件系统 (`overlay/OverlayFs.kt`) — copy-on-write，读真实 FS 写内存层
-- ✅ 多挂载点文件系统 (`mountable/MountableFs.kt`) — 路由到多个 FS 后端
-- ✅ 文件树遍历 (`traversal/Traversal.kt`) — DFS 迭代器 + 深度/条目预算 + 循环检测
-- ✅ Shell 元数据 (`ShellMetadata.kt`)
-- ✅ AST 节点类型 (`Ast.kt`) — 完整移植 Script/Statement/Pipeline/Commands/Words/Redirections/Arithmetic/Conditional 等所有节点
-- ✅ 核心类型 (`Types.kt`) — ExecResult, Command, CommandContext, ExecutionLimits
+### Foundation Modules
+- ✅ Encoding/byte-boundary helpers (`Encoding.kt`)
+- ✅ Path utilities (`PathUtils.kt`)
+- ✅ Virtual filesystem interface (`IFileSystem.kt`)
+- ✅ In-memory filesystem (`InMemoryFs.kt`) — full port, including symlinks, hard links, quotas
+- ✅ Filesystem initialization (`FsInit.kt`) — /dev, /proc, /bin, etc.
+- ✅ Error message sanitization (`SanitizeError.kt`) — replaces real paths with `<path>`
+- ✅ Real filesystem read/write (`readwrite/ReadWriteFs.kt`) — writes directly to the real disk, with symlink safety checks
+- ✅ Overlay filesystem (`overlay/OverlayFs.kt`) — copy-on-write, reads from the real FS, writes to the memory layer
+- ✅ Multi-mount filesystem (`mountable/MountableFs.kt`) — routes to multiple FS backends
+- ✅ File tree traversal (`traversal/Traversal.kt`) — DFS iterator + depth/entry budgets + cycle detection
+- ✅ Shell metadata (`ShellMetadata.kt`)
+- ✅ AST node types (`Ast.kt`) — full port of all nodes: Script/Statement/Pipeline/Commands/Words/Redirections/Arithmetic/Conditional, etc.
+- ✅ Core types (`Types.kt`) — ExecResult, Command, CommandContext, ExecutionLimits
 
-### 解析器 (parser)
-- ✅ 词法分析器 (`Lexer.kt`)
-- ✅ 递归下降解析器 (`Parser.kt`) — 完整语法
-- ✅ 复合命令解析 (if/for/while/case/functions)
-- ✅ 条件表达式解析 ([[ ]])
-- ✅ 算术表达式解析 (($ )) / (( ))
-- ✅ 参数展开解析 (${VAR...})
-- ✅ 命令替换、进程替换、heredoc 解析
+### Parser
+- ✅ Lexer (`Lexer.kt`)
+- ✅ Recursive-descent parser (`Parser.kt`) — complete grammar
+- ✅ Compound command parsing (if/for/while/case/functions)
+- ✅ Conditional expression parsing ([[ ]])
+- ✅ Arithmetic expression parsing (($ )) / (( ))
+- ✅ Parameter expansion parsing (${VAR...})
+- ✅ Command substitution, process substitution, heredoc parsing
 
-### 展开与算术 (expansion)
-- ✅ 参数展开 (${var}, ${var:-}, ${var:=}, ${var:?}, ${var:+}, ${#var}, ${var:offset:length})
-- ✅ 模式移除 (${var#pat}, ${var##pat}, ${var%pat}, ${var%%pat})
-- ✅ 模式替换 (${var/pat/rep}, ${var//pat/rep})
-- ✅ 大小写修改 (${var^}, ${var^^}, ${var,}, ${var,,})
-- ✅ 间接展开 (${!var})
-- ✅ 数组键展开 (${!arr[@]})
-- ✅ 大括号展开 ({a,b,c}, {1..10})
-- ✅ 波浪号展开 (~, ~user)
-- ✅ 算术展开 ($((...)))
-- ✅ 命令替换 ($(cmd), \`cmd\`)
-- ✅ 进程替换 (<(cmd), >(cmd))
-- ✅ 单词分割 ($IFS)
-- ✅ 文件名通配 (glob)
-- ✅ 引用处理 (单引号、双引号、转义)
+### Expansion & Arithmetic (expansion)
+- ✅ Parameter expansion (${var}, ${var:-}, ${var:=}, ${var:?}, ${var:+}, ${#var}, ${var:offset:length})
+- ✅ Pattern removal (${var#pat}, ${var##pat}, ${var%pat}, ${var%%pat})
+- ✅ Pattern substitution (${var/pat/rep}, ${var//pat/rep})
+- ✅ Case modification (${var^}, ${var^^}, ${var,}, ${var,,})
+- ✅ Indirect expansion (${!var})
+- ✅ Array key expansion (${!arr[@]})
+- ✅ Brace expansion ({a,b,c}, {1..10})
+- ✅ Tilde expansion (~, ~user)
+- ✅ Arithmetic expansion ($((...)))
+- ✅ Command substitution ($(cmd), \`cmd\`)
+- ✅ Process substitution (<(cmd), >(cmd))
+- ✅ Word splitting ($IFS)
+- ✅ Filename globbing (glob)
+- ✅ Quoting (single quotes, double quotes, escapes)
 
-### 解释器 (interpreter)
-- ✅ 主执行循环 (`Interpreter.kt`)
-- ✅ 语句/管道/简单命令/复合命令执行
-- ✅ 控制流 (if/for/while/until/case)
-- ✅ 函数定义与调用
-- ✅ 子 shell (()) 和组 ({ })
-- ✅ 条件命令 ([[ ]])
-- ✅ 算术命令 (( ))
-- ✅ 管道执行 (|, |&)
-- ✅ 重定向 (>, >>, <, <<, <<<, <<-, >&, <&, &>, 2>&1)
-- ✅ 命令解析 (PATH 查找、内建优先)
-- ✅ Shell 选项 (errexit, pipefail, nounset, noglob, xtrace 等)
-- ✅ 本地变量作用域
+### Interpreter
+- ✅ Main execution loop (`Interpreter.kt`)
+- ✅ Statement/pipeline/simple-command/compound-command execution
+- ✅ Control flow (if/for/while/until/case)
+- ✅ Function definition and invocation
+- ✅ Subshells (()) and groups ({ })
+- ✅ Conditional commands ([[ ]])
+- ✅ Arithmetic commands (( ))
+- ✅ Pipeline execution (|, |&)
+- ✅ Redirections (>, >>, <, <<, <<<, <<-, >&, <&, &>, 2>&1)
+- ✅ Command resolution (PATH lookup, builtins take precedence)
+- ✅ Shell options (errexit, pipefail, nounset, noglob, xtrace, etc.)
+- ✅ Local variable scoping
 
-### 内建命令 (builtins)
-- ✅ cd (含 -P/-L, CDPATH)
-- ✅ export (含 -n, -f, -p)
-- ✅ local (含 -a, -n)
-- ✅ read (含 -r, -d, -p, -a, -t, -n, -N, -s, -u)
+### Builtin Commands
+- ✅ cd (with -P/-L, CDPATH)
+- ✅ export (with -n, -f, -p)
+- ✅ local (with -a, -n)
+- ✅ read (with -r, -d, -p, -a, -t, -n, -N, -s, -u)
 - ✅ exit / return
-- ✅ unset (含 -f, -v)
+- ✅ unset (with -f, -v)
 - ✅ shift
 - ✅ eval
 - ✅ source / .
@@ -101,224 +103,224 @@ src/commands/**/*.ts            →  com.justbash.commands.*
 - ✅ let
 - ✅ set
 - ✅ declare
-- ✅ help (分类命令列表 + `<command> --help` 委托)
-- ✅ shopt (含 -s/-u/-p/-q/-o；所有 11 个 shell 选项)
-- ✅ dirs (含 -c/-l/-p/-v/+N/-N；目录栈)
-- ✅ complete (含 -W/-r/-p；补全设定)
-- ✅ compgen (含 -v/-e/-f/-d/-k/-A/-W/-P/-S；补全生成)
-- ✅ compopt (含 -o/+o；补全选项)
-- ✅ getopts (含 OPTIND/OPTARG/`:` 静默模式)
-- ✅ hash (含 -r/-d/-t/-p/-l；命令路径缓存)
-- ✅ mapfile (含 -d/-n/-O/-s/-t/-u/-C/-c；读取到数组)
+- ✅ help (categorized command list + `<command> --help` delegation)
+- ✅ shopt (with -s/-u/-p/-q/-o; all 11 shell options)
+- ✅ dirs (with -c/-l/-p/-v/+N/-N; directory stack)
+- ✅ complete (with -W/-r/-p; completion settings)
+- ✅ compgen (with -v/-e/-f/-d/-k/-A/-W/-P/-S; completion generation)
+- ✅ compopt (with -o/+o; completion options)
+- ✅ getopts (with OPTIND/OPTARG/`:` silent mode)
+- ✅ hash (with -r/-d/-t/-p/-l; command path cache)
+- ✅ mapfile (with -d/-n/-O/-s/-t/-u/-C/-c; read into array)
 
-### 外部命令 (coreutils)
-- ✅ echo (含 -n, -e, -E, \xNN, \uXXXX)
-- ✅ cat (含 -n, -b, -v, -e, -t, -s)
-- ✅ pwd (含 -L, -P)
-- ✅ ls (含 -l, -a, -A, -h, -t, -r, -R, -S, -1)
-- ✅ head (含 -n, -c, -q, -v)
-- ✅ tail (含 -n, -c, -q, -v)
+### External Commands (coreutils)
+- ✅ echo (with -n, -e, -E, \xNN, \uXXXX)
+- ✅ cat (with -n, -b, -v, -e, -t, -s)
+- ✅ pwd (with -L, -P)
+- ✅ ls (with -l, -a, -A, -h, -t, -r, -R, -S, -1)
+- ✅ head (with -n, -c, -q, -v)
+- ✅ tail (with -n, -c, -q, -v)
 - ✅ mkdir, rmdir, rm, cp, mv, ln, touch, chmod
-- ✅ wc (含 -l, -w, -c, -m)
-- ✅ sort (含 -n, -r, -u, -k, -t, -f, -s, -b)
-- ✅ uniq (含 -c, -d, -u, -i, -f, -s, -w)
+- ✅ wc (with -l, -w, -c, -m)
+- ✅ sort (with -n, -r, -u, -k, -t, -f, -s, -b)
+- ✅ uniq (with -c, -d, -u, -i, -f, -s, -w)
 - ✅ basename, dirname
-- ✅ tr (含 -d, -s, -c)
+- ✅ tr (with -d, -s, -c)
 - ✅ env, printenv
 - ✅ true, false
-- ✅ grep (含 -i, -v, -n, -l, -L, -c, -o, -E, -F, -w, -x, -r, -e)
-- ✅ base64 (含 -d, -w；`java.util.Base64`)
-- ✅ printf (含 %s %d %x %o %f %c %b %q；`String.format`)
-- ✅ seq (含 -s, -w；纯逻辑)
-- ✅ sleep (含 s/m/h/d 后缀；`kotlinx.coroutines.delay`，可被 `withTimeout` 协作取消)
-- ✅ stat (含 -c FORMAT)
-- ✅ date (含 +FORMAT, -d TIMESTAMP；`java.time`)
-- ✅ md5sum, sha1sum, sha256sum (含 -c, --tag；`MessageDigest`)
-- ✅ expr (含 + - * / % 及字符串/正则运算)
-- ✅ readlink (含 -f, -e, -m, -n)
-- ✅ awk (含 -F, -v；依赖 Jawk 解释器)
-- ✅ jq (含 -r, -c, -n, -s, -R；依赖 jackson-jq)
-- ✅ diff (含 -u, -q, -s, -i；依赖 java-diff-utils)
-- ✅ sed (含 s/d/p/q/a/i/c/y/h/g/b/t 命令、地址、-E、-i、-n、-e、-f)
-- ✅ find (含 -name/-type/-size/-perm/-mtime/-newer/-prune/-delete/-exec/-print 等)
-- ✅ curl (含 -X/-H/-d/-o/-s/-v/-L/-i/-I；JDK 11 `HttpClient`)
-- ✅ tar (含 -c/-x/-t/-f/-z/-v/-C；commons-compress)
+- ✅ grep (with -i, -v, -n, -l, -L, -c, -o, -E, -F, -w, -x, -r, -e)
+- ✅ base64 (with -d, -w; `java.util.Base64`)
+- ✅ printf (with %s %d %x %o %f %c %b %q; `String.format`)
+- ✅ seq (with -s, -w; pure logic)
+- ✅ sleep (with s/m/h/d suffixes; `kotlinx.coroutines.delay`, cooperatively cancellable via `withTimeout`)
+- ✅ stat (with -c FORMAT)
+- ✅ date (with +FORMAT, -d TIMESTAMP; `java.time`)
+- ✅ md5sum, sha1sum, sha256sum (with -c, --tag; `MessageDigest`)
+- ✅ expr (with + - * / % plus string/regex operations)
+- ✅ readlink (with -f, -e, -m, -n)
+- ✅ awk (with -F, -v; backed by the Jawk interpreter)
+- ✅ jq (with -r, -c, -n, -s, -R; backed by jackson-jq)
+- ✅ diff (with -u, -q, -s, -i; backed by java-diff-utils)
+- ✅ sed (with s/d/p/q/a/i/c/y/h/g/b/t commands, addresses, -E, -i, -n, -e, -f)
+- ✅ find (with -name/-type/-size/-perm/-mtime/-newer/-prune/-delete/-exec/-print, etc.)
+- ✅ curl (with -X/-H/-d/-o/-s/-v/-L/-i/-I; JDK 11 `HttpClient`)
+- ✅ tar (with -c/-x/-t/-f/-z/-v/-C; commons-compress)
 - ✅ gzip, gunzip, zcat (`java.util.zip.GZIPInputStream`/`GZIPOutputStream`)
-- ✅ yq (含 -p/-o/-r/-c/-I；SnakeYAML)
-- ✅ timeout (含 s/m/h/d 后缀；`withTimeout` 真正超时取消，对齐原版 `AbortController`/`AbortSignal`)
-- ✅ rg (ripgrep，含 gitignore/文件类型/智能大小写/递归搜索)
-- ✅ bash, sh (含 -c、脚本文件；`ctx.exec` 代理)
-- ✅ split (含 -l/-b/-n/-a/-d/--additional-suffix)
-- ✅ tee (含 -a；stdin 分流到文件和 stdout)
-- ✅ time (含 -f/-o/-a/-v/-p；`System.currentTimeMillis` 计时)
-- ✅ tree (含 -L/-a/-d/-f；递归目录树)
-- ✅ which (含 -a/-s；PATH 查找)
+- ✅ yq (with -p/-o/-r/-c/-I; SnakeYAML)
+- ✅ timeout (with s/m/h/d suffixes; true timeout cancellation via `withTimeout`, matching the original `AbortController`/`AbortSignal`)
+- ✅ rg (ripgrep, with gitignore/file types/smart case/recursive search)
+- ✅ bash, sh (with -c, script files; `ctx.exec` delegation)
+- ✅ split (with -l/-b/-n/-a/-d/--additional-suffix)
+- ✅ tee (with -a; splits stdin to files and stdout)
+- ✅ time (with -f/-o/-a/-v/-p; timed with `System.currentTimeMillis`)
+- ✅ tree (with -L/-a/-d/-f; recursive directory tree)
+- ✅ which (with -a/-s; PATH lookup)
 - ✅ whoami (`System.getProperty("user.name")`)
-- ✅ xargs (含 -I/-d/-n/-0/-t/-r；`ctx.exec` 代理)
-- ✅ html-to-markdown (正则 HTML→Markdown 转换)
-- ✅ alias (含 unalias -a；存储到 `BASH_ALIAS_<name>`)
-- ✅ clear (ANSI 清屏)
-- ✅ cut (含 -d/-f/-c/-s)
-- ✅ du (含 -s/-h/-a/-c/--max-depth)
-- ✅ expand (含 -t/-i；制表符→空格)
-- ✅ fold (含 -w/-s/-b；文本折行)
-- ✅ history (含 -c；读取 `BASH_HISTORY`)
+- ✅ xargs (with -I/-d/-n/-0/-t/-r; `ctx.exec` delegation)
+- ✅ html-to-markdown (regex-based HTML→Markdown conversion)
+- ✅ alias (with unalias -a; stored as `BASH_ALIAS_<name>`)
+- ✅ clear (ANSI clear screen)
+- ✅ cut (with -d/-f/-c/-s)
+- ✅ du (with -s/-h/-a/-c/--max-depth)
+- ✅ expand (with -t/-i; tabs→spaces)
+- ✅ fold (with -w/-s/-b; text wrapping)
+- ✅ history (with -c; reads `BASH_HISTORY`)
 - ✅ hostname (`InetAddress.getLocalHost`)
-- ✅ nl (含 -b/-n/-w/-s/-v/-i；行号输出)
-- ✅ column (含 -t/-s/-o/-c/-n)
-- ✅ comm (含 -1/-2/-3)
-- ✅ file (含 magic byte 检测)
-- ✅ join (含 -1/-2/-t/-a/-v/-o/-i)
-- ✅ od (含 -A/-t/-N；八进制/十六进制 dump)
-- ✅ paste (含 -d/-s)
-- ✅ rev (字符反转)
-- ✅ strings (含 -n/-t/-e)
-- ✅ tac (行反转)
+- ✅ nl (with -b/-n/-w/-s/-v/-i; numbered lines)
+- ✅ column (with -t/-s/-o/-c/-n)
+- ✅ comm (with -1/-2/-3)
+- ✅ file (with magic-byte detection)
+- ✅ join (with -1/-2/-t/-a/-v/-o/-i)
+- ✅ od (with -A/-t/-N; octal/hex dump)
+- ✅ paste (with -d/-s)
+- ✅ rev (character reversal)
+- ✅ strings (with -n/-t/-e)
+- ✅ tac (line reversal)
 
-## 未移植的模块
+## Modules Not Ported
 
-以下模块因依赖 JS/WASM 运行时或第三方 native 库，无法在 JVM 上直接移植：
+The following modules depend on a JS/WASM runtime or third-party native libraries and cannot be ported directly to the JVM:
 
-### 运行时依赖 (不可移植)
-| 模块 | 原因 |
-|------|------|
-| `python3` / `python` | 依赖 CPython WASM (Emscripten) |
-| `sqlite3` | 依赖 sql.js (WASM) |
-| `js-exec` / `node` | 依赖 QuickJS WASM (quickjs-emscripten) |
-| `worker-bridge` | 依赖 SharedArrayBuffer/Atomics (浏览器/Node) |
-| `defense-in-depth` | 依赖 AsyncLocalStorage + Proxy 全局拦截 (Node.js 特有) |
-| `security/fuzzing` | 依赖 Node 运行时特性 |
-| `sandbox` (Vercel Sandbox API) | 依赖网络/进程隔离 |
+### Runtime Dependencies (not portable)
+| Module | Reason |
+|--------|--------|
+| `python3` / `python` | Depends on CPython WASM (Emscripten) |
+| `sqlite3` | Depends on sql.js (WASM) |
+| `js-exec` / `node` | Depends on QuickJS WASM (quickjs-emscripten) |
+| `worker-bridge` | Depends on SharedArrayBuffer/Atomics (browser/Node) |
+| `defense-in-depth` | Depends on AsyncLocalStorage + Proxy global interception (Node.js specific) |
+| `security/fuzzing` | Depends on Node runtime features |
+| `sandbox` (Vercel Sandbox API) | Depends on network/process isolation |
 
-### 功能复杂，已移植或已评估
-| 模块 | 实现方式 | 状态 |
-|------|---------|------|
-| `awk` | [Jawk](https://jawk.io/)（`io.jawk:jawk:7.1.00`） | ✅ 已引入依赖 |
-| `jq` | [jackson-jq](https://github.com/eiiches/jackson-jq)（`net.thisptr:jackson-jq:1.6.2`） | ✅ 已引入依赖 |
-| `diff` | [java-diff-utils](https://github.com/java-diff-utils/java-diff-utils)（`io.github.java-diff-utils:java-diff-utils:4.15`） | ✅ 已引入依赖 |
-| `curl` | JDK 11 `java.net.http.HttpClient`（零外部依赖） | ✅ 已移植 |
-| `tar` | [commons-compress](https://commons.apache.org/compress/)（`org.apache.commons:commons-compress:1.28.0`） | ✅ 已引入依赖 |
-| `gzip/gunzip/zcat` | `java.util.zip.GZIPInputStream`/`GZIPOutputStream`（JDK 内置） | ✅ 已移植 |
-| `yq` | [SnakeYAML](https://bitbucket.org/snakeyaml/snakeyaml)（`org.yaml:snakeyaml:2.2`） | ✅ 已引入依赖 |
-| `timeout` | `withTimeout` 真正超时取消（对齐原版 `AbortController`/`AbortSignal`） | ✅ 已移植 |
-| `rg` (ripgrep) | 无（自行移植，1104 行，含 gitignore/文件类型/智能大小写） | ✅ 已移植 |
-| `xan` | 无（简化移植，737 行，含 15 核心子命令，内联 CSV 解析） | ✅ 已移植 |
-| `sed` | 无（自行移植，1611 行，含 lexer/parser/executor） | ✅ 已移植 |
-| `find` | 无（自行移植，1097 行，含 predicates/operators/actions） | ✅ 已移植 |
-| `base64` | Java 标准库 `java.util.Base64` | ✅ 已移植 |
-| `printf` | `String.format` + 自定义 `%b`/`%q` | ✅ 已移植 |
-| `seq` | 纯逻辑 | ✅ 已移植 |
-| `sleep` | `kotlinx.coroutines.delay`（可被 `withTimeout` 协作取消） | ✅ 已移植 |
-| `stat` | `IFileSystem.stat/lstat/readlink` | ✅ 已移植 |
-| `date` | `java.time` + strftime 转换 | ✅ 已移植 |
-| `expr` | 递归下降表达式求值 | ✅ 已移植 |
-| `md5sum`/`sha1sum`/`sha256sum` | `java.security.MessageDigest` | ✅ 已移植 |
-| `readlink` | `IFileSystem.readlink/realpath` | ✅ 已移植 |
+### Complex Features, Ported or Evaluated
+| Module | Implementation | Status |
+|--------|---------------|--------|
+| `awk` | [Jawk](https://jawk.io/) (`io.jawk:jawk:7.1.00`) | ✅ Dependency added |
+| `jq` | [jackson-jq](https://github.com/eiiches/jackson-jq) (`net.thisptr:jackson-jq:1.6.2`) | ✅ Dependency added |
+| `diff` | [java-diff-utils](https://github.com/java-diff-utils/java-diff-utils) (`io.github.java-diff-utils:java-diff-utils:4.15`) | ✅ Dependency added |
+| `curl` | JDK 11 `java.net.http.HttpClient` (zero external dependencies) | ✅ Ported |
+| `tar` | [commons-compress](https://commons.apache.org/compress/) (`org.apache.commons:commons-compress:1.28.0`) | ✅ Dependency added |
+| `gzip/gunzip/zcat` | `java.util.zip.GZIPInputStream`/`GZIPOutputStream` (built into the JDK) | ✅ Ported |
+| `yq` | [SnakeYAML](https://bitbucket.org/snakeyaml/snakeyaml) (`org.yaml:snakeyaml:2.2`) | ✅ Dependency added |
+| `timeout` | True timeout cancellation with `withTimeout` (matches the original `AbortController`/`AbortSignal`) | ✅ Ported |
+| `rg` (ripgrep) | None (ported from scratch, 1104 lines, incl. gitignore/file types/smart case) | ✅ Ported |
+| `xan` | None (simplified port, 737 lines, 15 core subcommands, inline CSV parser) | ✅ Ported |
+| `sed` | None (ported from scratch, 1611 lines, incl. lexer/parser/executor) | ✅ Ported |
+| `find` | None (ported from scratch, 1097 lines, incl. predicates/operators/actions) | ✅ Ported |
+| `base64` | Java standard library `java.util.Base64` | ✅ Ported |
+| `printf` | `String.format` + custom `%b`/`%q` | ✅ Ported |
+| `seq` | Pure logic | ✅ Ported |
+| `sleep` | `kotlinx.coroutines.delay` (cooperatively cancellable via `withTimeout`) | ✅ Ported |
+| `stat` | `IFileSystem.stat/lstat/readlink` | ✅ Ported |
+| `date` | `java.time` + strftime conversion | ✅ Ported |
+| `expr` | Recursive-descent expression evaluation | ✅ Ported |
+| `md5sum`/`sha1sum`/`sha256sum` | `java.security.MessageDigest` | ✅ Ported |
+| `readlink` | `IFileSystem.readlink/realpath` | ✅ Ported |
 
-### 功能复杂，不需要移植或永不移植
-| 模块 | 原因 |
-|------|------|
-| `query-engine` | 原 TS 约 6800 行。Jq 命令已用 jackson-jq 外部引擎替代，query-engine 不再需要移植 |
+### Complex Features, Not Needed or Never to Be Ported
+| Module | Reason |
+|--------|--------|
+| `query-engine` | Original TS is ~6800 lines. The jq command is already covered by the external jackson-jq engine, so query-engine no longer needs porting |
 
-### 安全相关 (不可移植)
-| 模块 | 原因 |
-|------|------|
-| `security/defense-in-depth-box` | `AsyncLocalStorage` + `Proxy` 全局拦截——Node.js 专有，JVM 无法实现 |
-| `security/blocked-globals` | 拦截 `Function`/`eval`/`require`/`process` 等 Node 全局——JVM 不存在这些对象 |
-| `security/fuzzing` | 大规模模糊测试框架——测试基础设施 |
-| `security/worker-defense-in-depth` | Worker 线程防御——依赖 Node `worker_threads` |
-| `security/attacks/*` | 攻击回归测试——测试基础设施 |
-| `security/prototype-pollution/*` | JS 原型污染测试——JVM 无原型链，不需要 |
+### Security-Related (not portable)
+| Module | Reason |
+|--------|--------|
+| `security/defense-in-depth-box` | `AsyncLocalStorage` + `Proxy` global interception — Node.js only, not implementable on the JVM |
+| `security/blocked-globals` | Intercepts Node globals such as `Function`/`eval`/`require`/`process` — these objects don't exist on the JVM |
+| `security/fuzzing` | Large-scale fuzzing framework — test infrastructure |
+| `security/worker-defense-in-depth` | Worker-thread defense — depends on Node `worker_threads` |
+| `security/attacks/*` | Attack regression tests — test infrastructure |
+| `security/prototype-pollution/*` | JS prototype-pollution tests — no prototype chain on the JVM, not needed |
 
-### 其他
-| 模块 | 原因 |
-|------|------|
-| `browser.ts` | 浏览器打包 —— JVM 环境不需要 |
-| `sandbox/Sandbox` | Vercel 沙箱 API —— 依赖网络/进程隔离，不可移植 |
-| `network/dns-pin` | DNS 绑定防范 —— 需要 native DNS 能力，`InMemoryFs` 环境无 DNS 重绑定风险，跳过 |
+### Others
+| Module | Reason |
+|--------|--------|
+| `browser.ts` | Browser bundle — not needed on the JVM |
+| `sandbox/Sandbox` | Vercel Sandbox API — depends on network/process isolation, not portable |
+| `network/dns-pin` | DNS pinning — requires native DNS capabilities; no DNS-rebinding risk in the `InMemoryFs` environment, skipped |
 
-## CLI 入口（已移植）
+## CLI Entry Point (ported)
 
-- ✅ `com.justbash.cli.JustBashCli` — 命令行入口（单次执行 + `--shell` REPL 模式）。
-- ✅ `com.justbash.cli.VirtualShell` — 交互式 REPL，基于 OverlayFs（读真实文件系统，写内存层），支持彩色提示符、历史、exit 命令。
-- ✅ 打包为可执行 fat-jar（`./gradlew build` → `build/libs/just-bash-kotlin-0.1.0.jar`）。
-- ✅ 运行：`java -jar just-bash-kotlin-0.1.0.jar -c 'echo hello'`。
-- ✅ REPL：`java -jar just-bash-kotlin-0.1.0.jar --shell`。
-- 支持选项：`-c <script>`、`-e/--errexit`、`--json`、`--shell`、`--file REAL=VPATH`、
-  `-h/--help`、`-v/--version`、脚本文件、stdin 管道。
-- 已验证：echo、for 循环、stdin、脚本文件、errexit、JSON 输出、版本、帮助、REPL 非交互逐行执行。
+- ✅ `com.justbash.cli.JustBashCli` — CLI entry point (one-shot execution + `--shell` REPL mode).
+- ✅ `com.justbash.cli.VirtualShell` — interactive REPL built on OverlayFs (reads the real filesystem, writes to the memory layer), with colored prompt, history, and exit command.
+- ✅ Packaged as an executable fat-jar (`./gradlew build` → `build/libs/just-bash-kotlin-0.1.0.jar`).
+- ✅ Run: `java -jar just-bash-kotlin-0.1.0.jar -c 'echo hello'`.
+- ✅ REPL: `java -jar just-bash-kotlin-0.1.0.jar --shell`.
+- Supported options: `-c <script>`, `-e/--errexit`, `--json`, `--shell`, `--file REAL=VPATH`,
+  `-h/--help`, `-v/--version`, script files, stdin pipes.
+- Verified: echo, for loops, stdin, script files, errexit, JSON output, version, help, non-interactive line-by-line REPL execution.
 
-### 说明：文件系统实现
+### Note: Filesystem Implementations
 
-| FS 实现 | 读操作 | 写操作 | 持久化 | 用途 |
-|---------|--------|--------|--------|------|
-| `InMemoryFs` | 内存 | 内存 | 否 | 默认（纯内存虚拟 FS） |
-| `OverlayFs` | 真实磁盘 | 内存层（copy-on-write） | 否 | 安全沙箱 |
-| `ReadWriteFs` | 真实磁盘 | 真实磁盘 | 是 | 需要持久化写入 |
-| `MountableFs` | 取决于挂载的后端 | 取决于挂载的后端 | 取决于挂载的后端 | 组合多个 FS 后端 |
+| FS implementation | Reads | Writes | Persistence | Purpose |
+|-------------------|-------|--------|-------------|---------|
+| `InMemoryFs` | Memory | Memory | No | Default (pure in-memory virtual FS) |
+| `OverlayFs` | Real disk | Memory layer (copy-on-write) | No | Safe sandbox |
+| `ReadWriteFs` | Real disk | Real disk | Yes | Persistent writes needed |
+| `MountableFs` | Depends on mounted backend | Depends on mounted backend | Depends on mounted backend | Combines multiple FS backends |
 
-- ✅ 通过 `BashEnvironment(fsOverride = ...)` 注入任意 `IFileSystem` 实现
-- ✅ REPL 支持三种模式：`--shell`（OverlayFs）、`--shell --readwrite`（ReadWriteFs）、`--shell --mountable VPATH=REALPATH,...`（MountableFs）
+- ✅ Inject any `IFileSystem` implementation via `BashEnvironment(fsOverride = ...)`
+- ✅ REPL supports three modes: `--shell` (OverlayFs), `--shell --readwrite` (ReadWriteFs), `--shell --mountable VPATH=REALPATH,...` (MountableFs)
 
-## 关键差异
+## Key Differences
 
-### 类型系统
-- TS 使用 `number` (double) 表示算术值；Kotlin 使用 `Double` 以匹配语义
-- TS 使用 `Record<string, T>` + 原型污染防护；Kotlin 使用 `MutableMap<String, T>` 天然安全
-- TS 使用 `ByteString` (opaque tagged string) 标记字节/文本边界；Kotlin 使用 `ByteArray` vs `String` 天然区分
+### Type System
+- TS uses `number` (double) for arithmetic values; Kotlin uses `Double` to match the semantics
+- TS uses `Record<string, T>` + prototype-pollution guards; Kotlin uses `MutableMap<String, T>`, which is inherently safe
+- TS uses `ByteString` (opaque tagged string) to mark byte/text boundaries; Kotlin distinguishes them natively with `ByteArray` vs `String`
 
-### 同步 vs 异步
-- TS 原版所有 I/O 和命令执行都是 `async`/`Promise`
-- **Kotlin 移植版已用 coroutine 改造**：`Command.execute` 为 `suspend`，`BashEnvironment.exec` 为 `suspend`，`timeout` 用 `withTimeout` 实现真正的超时取消，对齐原版 `AbortController`/`AbortSignal` 语义
+### Sync vs Async
+- In the original TS version, all I/O and command execution is `async`/`Promise`
+- **The Kotlin port has been converted to coroutines**: `Command.execute` is `suspend`, `BashEnvironment.exec` is `suspend`, and `timeout` uses `withTimeout` for true timeout cancellation, matching the original `AbortController`/`AbortSignal` semantics
 
-### 不可移植的 JS 特性
-- `Object.create(null)` 原型污染防护 → 不需要，Kotlin Map 无原型链
-- `Proxy` 全局拦截 → 不需要
-- `AbortSignal` 协程取消 → 已通过 Kotlin coroutine `withTimeout` + `Job.cancel()` 实现，对齐原版语义
-- WASM 模块加载 → 不适用
+### Non-Portable JS Features
+- `Object.create(null)` prototype-pollution guard → not needed; Kotlin Maps have no prototype chain
+- `Proxy` global interception → not needed
+- `AbortSignal` coroutine cancellation → implemented via Kotlin coroutine `withTimeout` + `Job.cancel()`, matching the original semantics
+- WASM module loading → not applicable
 
-### Coroutine 异步化（已实施，2026-08-21）
+### Coroutine Async (implemented 2026-08-21)
 
-Kotlin coroutine 异步化已完成，一一对齐 just-bash 原实现：
+Kotlin coroutine async conversion is complete, aligned one-to-one with the just-bash implementation:
 
-| 改造项 | 状态 |
-|--------|------|
-| `Command.execute` 改为 `suspend` | ✅ 已完成（50+ Command 实现） |
-| `Interpreter` 执行链改为 `suspend` | ✅ 已完成（全部执行方法） |
-| `BashEnvironment.exec` 改为 `suspend` | ✅ 已完成 |
-| `CommandContext.exec` 回调改为 `suspend` | ✅ 已完成 |
-| `timeout` 命令用 `withTimeout` 实现真正超时取消 | ✅ 已完成（对齐原版 `AbortController`/`AbortSignal`） |
-| `ExpansionBridge` 用 `runBlocking` 桥接 suspend 调用 | ✅ 已完成 |
-| CLI 用 `runBlocking` 调用 suspend 入口 | ✅ 已完成 |
-| 测试文件用 `runBlocking` 包装 suspend 调用 | ✅ 已完成 |
+| Change | Status |
+|--------|--------|
+| `Command.execute` changed to `suspend` | ✅ Done (50+ Command implementations) |
+| `Interpreter` execution chain changed to `suspend` | ✅ Done (all execution methods) |
+| `BashEnvironment.exec` changed to `suspend` | ✅ Done |
+| `CommandContext.exec` callback changed to `suspend` | ✅ Done |
+| `timeout` command uses `withTimeout` for true timeout cancellation | ✅ Done (matches original `AbortController`/`AbortSignal`) |
+| `ExpansionBridge` bridges suspend calls with `runBlocking` | ✅ Done |
+| CLI calls the suspend entry point with `runBlocking` | ✅ Done |
+| Test files wrap suspend calls with `runBlocking` | ✅ Done |
 
-**决策**：Kotlin coroutine 作为异步方案，已完整实施。`AbortSignal` 的协作取消通过 `withTimeout` + `Job.cancel()` 实现，`timeout` 命令现在能真正在规定时间内取消执行。
+**Decision**: Kotlin coroutines are the async solution and have been fully implemented. Cooperative cancellation of `AbortSignal` is implemented via `withTimeout` + `Job.cancel()`, so the `timeout` command can now genuinely cancel execution within the specified time.
 
-### 管道二进制传输
-- ✅ 已支持方案 C（latin1 编码 + `stdoutKind` 标记）：`ExecResult.stdoutKind` 为 `"bytes"`/`"binary"` 时，stdout 作为 latin1 字节传递到下一个命令的 stdin（`ByteArray`）；`"text"` 时 UTF-8 编码后传递
-- ✅ `gzip -c | gunzip` 等管道二进制场景现在正常工作
-- ✅ `PipelineExecution.stdoutToStdin()` 根据 `stdoutKind` 自动转换
+### Binary Pipe Transfer
+- ✅ Supported via option C (latin1 encoding + `stdoutKind` marker): when `ExecResult.stdoutKind` is `"bytes"`/`"binary"`, stdout is passed as latin1 bytes to the next command's stdin (`ByteArray`); when `"text"`, it is passed UTF-8 encoded
+- ✅ Binary pipe scenarios such as `gzip -c | gunzip` now work correctly
+- ✅ `PipelineExecution.stdoutToStdin()` converts automatically based on `stdoutKind`
 
-### 自定义命令扩展
-- ✅ `com.justbash.CustomCommands.defineCommand()` — 工厂函数，从 lambda 创建 `Command`
-- ✅ `com.justbash.LazyCommand` — 延迟加载命令（首次执行时加载，用于 code-splitting）
-- ✅ `BashEnvironment(customCommands = listOf(...))` — 注册自定义命令，可覆盖内置命令
+### Custom Command Extensions
+- ✅ `com.justbash.CustomCommands.defineCommand()` — factory function that creates a `Command` from a lambda
+- ✅ `com.justbash.LazyCommand` — lazily loaded command (loaded on first execution, for code-splitting)
+- ✅ `BashEnvironment(customCommands = listOf(...))` — registers custom commands, can override builtins
 
-### 网络安全层
-- ✅ `com.justbash.network.SecureFetch` — URL 白名单 + 方法检查 + 超时 + 响应大小限制 + 手动重定向控制
-- ✅ `NetworkConfig` — 白名单配置、允许的 HTTP 方法、超时、响应大小限制
-- ✅ 使用 JDK 11 `java.net.http.HttpClient`（零外部依赖）
-- ⚠️ DNS 绑定（`dns-pin`）未移植——需要 native DNS 能力，`InMemoryFs` 环境无 DNS 重绑定风险
+### Network Security Layer
+- ✅ `com.justbash.network.SecureFetch` — URL allowlist + method checks + timeout + response size limits + manual redirect control
+- ✅ `NetworkConfig` — allowlist configuration, allowed HTTP methods, timeouts, response size limits
+- ✅ Uses JDK 11 `java.net.http.HttpClient` (zero external dependencies)
+- ⚠️ DNS pinning (`dns-pin`) not ported — requires native DNS capabilities; no DNS-rebinding risk in the `InMemoryFs` environment
 
-## 构建和测试
+## Build & Test
 
 ```bash
-./gradlew test          # 编译并运行全部测试（624 tests）
-./gradlew build         # 编译 + 测试 + 打包 fat-jar
-./gradlew shadowJar     # 仅打包 fat-jar（跳过测试）
+./gradlew test          # compile and run all tests (624 tests)
+./gradlew build         # compile + test + package fat-jar
+./gradlew shadowJar     # package fat-jar only (skip tests)
 ```
 
-CLI 运行：
+CLI usage:
 
 ```bash
 java -jar build/libs/just-bash-kotlin-0.1.0.jar -c 'echo hello'
@@ -326,19 +328,19 @@ echo 'echo from-stdin' | java -jar build/libs/just-bash-kotlin-0.1.0.jar
 java -jar build/libs/just-bash-kotlin-0.1.0.jar -c 'echo hi' --json
 ```
 
-## 测试覆盖
+## Test Coverage
 
-- 文件系统: 读写、追加、目录、权限、symlink、hard link、配额、OverlayFs、ReadWriteFs、MountableFs、遍历（61 tests）
-- 解析器: 简单命令、引用、参数展开、命令替换、算术展开、管道、控制流、函数、heredoc（46 tests）
-- 展开: 参数展开、大括号、波浪号、算术、命令替换、单词分割、通配（44 tests）
-- 解释器: 执行流程、管道、重定向、控制流、函数、内建命令（10 tests）
-- 端到端集成: 完整 pipeline parse → interpreter → commands（15 tests）
-- 完整展开引擎验证: ${var:-}, ${#var}, 大括号, 模式移除, 大小写, 波浪号（8 tests）
-- 条件命令/文件测试: [[ ]], [ ], 文件测试, 算术命令（9 tests）
-- 第一轮命令: echo, cat, ls, grep, sort, wc, tr, uniq, env, mkdir, rm, cp, mv 等（121 tests）
-- 第二轮命令: base64, printf, seq, sleep, stat, date, checksum, expr, readlink（104 tests）
-- 第三轮命令: awk, jq, diff, find, sed（72 tests）
-- 第四轮命令: curl, tar, gzip, yq, timeout, rg, xan（101 tests）
-- transform 序列化 + 变换管道 + 插件（19 tests）
-- 管道二进制 + CLI REPL（5 tests）
-- **总计: 624 tests**
+- Filesystem: reads, writes, appends, directories, permissions, symlinks, hard links, quotas, OverlayFs, ReadWriteFs, MountableFs, traversal (61 tests)
+- Parser: simple commands, quoting, parameter expansion, command substitution, arithmetic expansion, pipelines, control flow, functions, heredocs (46 tests)
+- Expansion: parameter expansion, braces, tildes, arithmetic, command substitution, word splitting, globs (44 tests)
+- Interpreter: execution flow, pipelines, redirections, control flow, functions, builtins (10 tests)
+- End-to-end integration: full pipeline parse → interpreter → commands (15 tests)
+- Full expansion-engine verification: ${var:-}, ${#var}, braces, pattern removal, case conversion, tildes (8 tests)
+- Conditional/file tests: [[ ]], [ ], file tests, arithmetic commands (9 tests)
+- First-round commands: echo, cat, ls, grep, sort, wc, tr, uniq, env, mkdir, rm, cp, mv, etc. (121 tests)
+- Second-round commands: base64, printf, seq, sleep, stat, date, checksums, expr, readlink (104 tests)
+- Third-round commands: awk, jq, diff, find, sed (72 tests)
+- Fourth-round commands: curl, tar, gzip, yq, timeout, rg, xan (101 tests)
+- transform serialization + transform pipeline + plugins (19 tests)
+- Binary pipes + CLI REPL (5 tests)
+- **Total: 624 tests**

@@ -1,60 +1,62 @@
 # just-bash-kotlin
 
-`just-bash` 的 Kotlin 移植版本 —— 一个带内存虚拟文件系统的 bash 模拟环境。
+English | [中文](README.zh.md)
 
-原始项目（TypeScript）：[vercel-labs/just-bash](https://github.com/vercel-labs/just-bash)
+A Kotlin port of `just-bash` — a bash emulation environment with an in-memory virtual filesystem.
 
-## 构建与测试
+Original project (TypeScript): [vercel-labs/just-bash](https://github.com/vercel-labs/just-bash)
+
+## Build & Test
 
 ```bash
-./gradlew test          # 编译并运行全部测试（624 tests）
-./gradlew build         # 编译 + 测试 + 打包 fat-jar
-./gradlew shadowJar     # 仅打包 fat-jar（跳过测试）
+./gradlew test          # compile and run all tests (624 tests)
+./gradlew build         # compile + test + package fat-jar
+./gradlew shadowJar     # package fat-jar only (skip tests)
 ```
 
-## CLI 运行
+## CLI Usage
 
-### 单次执行
+### One-shot Execution
 
 ```bash
-# 打包
+# Package
 ./gradlew build
 
-# 执行脚本
+# Execute scripts
 java -jar build/libs/just-bash-kotlin-0.1.0.jar -c 'echo "hello $(date)"'
 java -jar build/libs/just-bash-kotlin-0.1.0.jar -c 'ls -la'
 java -jar build/libs/just-bash-kotlin-0.1.0.jar -c 'echo hi' --json
-java -jar build/libs/just-bash-kotlin-0.1.0.jar -e -c 'false; echo ok'  # errexit 模式
+java -jar build/libs/just-bash-kotlin-0.1.0.jar -e -c 'false; echo ok'  # errexit mode
 
-# 管道输入
+# Piped input
 echo 'echo hello' | java -jar build/libs/just-bash-kotlin-0.1.0.jar
 
-# 脚本文件
+# Script file
 java -jar build/libs/just-bash-kotlin-0.1.0.jar script.sh
 ```
 
-### 交互式 REPL（OverlayFs / ReadWriteFs / MountableFs）
+### Interactive REPL (OverlayFs / ReadWriteFs / MountableFs)
 
-REPL 支持三种文件系统后端：
+The REPL supports three filesystem backends:
 
-- **OverlayFs**（默认）：**读**真实文件系统，**写**内存层（copy-on-write），不触及磁盘 —— 适合安全沙箱
-- **ReadWriteFs**（`--readwrite`）：直接**读写**真实磁盘 —— 适合需要持久化写操作的场景
-- **MountableFs**（`--mountable`）：多挂载点，将多个真实目录挂载到不同虚拟路径
+- **OverlayFs** (default): **reads** the real filesystem, **writes** to an in-memory layer (copy-on-write), never touches the disk — ideal as a safe sandbox
+- **ReadWriteFs** (`--readwrite`): **reads and writes** the real disk directly — for scenarios that require persistent writes
+- **MountableFs** (`--mountable`): multiple mount points, mapping several real directories to different virtual paths
 
-#### OverlayFs REPL（写内存层，不触磁盘）
+#### OverlayFs REPL (writes to memory layer, disk untouched)
 
 ```bash
-# 启动交互式 REPL（在当前目录挂载真实文件系统，写内存层）
+# Start an interactive REPL (mount the real filesystem under the current directory, writes stay in memory)
 java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell
 
-# 指定挂载目录
+# Specify the mount directory
 java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell --root /path/to/project
 
-# 非交互管道输入
+# Non-interactive piped input
 echo 'echo hi' | java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell
 ```
 
-**OverlayFs REPL 示例：**
+**OverlayFs REPL example:**
 
 ```bash
 $ java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell --root /path/to/project
@@ -72,7 +74,7 @@ Reads from real filesystem, writes stay in memory (OverlayFs).
 user@virtual:~$ ls
 README.md  src/  build.gradle.kts  ...
 
-user@virtual:~$ echo "hello" > /tmp/test.txt     # 写入内存层，真实磁盘不变
+user@virtual:~$ echo "hello" > /tmp/test.txt     # written to the memory layer, real disk unchanged
 user@virtual:~$ cat /tmp/test.txt
 hello
 
@@ -82,94 +84,94 @@ hello
 user@virtual:~$ exit
 ```
 
-#### ReadWriteFs REPL（写真实磁盘）
+#### ReadWriteFs REPL (writes to the real disk)
 
 ```bash
-# 启动 REPL，写操作直接触及真实磁盘
+# Start the REPL with writes going directly to the real disk
 java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell --readwrite --root /path/to/project
 
-# 非交互管道输入（写真实磁盘）
+# Non-interactive piped input (writes to the real disk)
 echo 'echo persisted > result.txt' | java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell --readwrite --root /path/to/project
 ```
 
-**ReadWriteFs REPL 示例：**
+**ReadWriteFs REPL example:**
 
 ```bash
 $ java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell --readwrite --root /path/to/project
 
-user@virtual:~$ echo "persisted" > result.txt    # 真实磁盘写入
+user@virtual:~$ echo "persisted" > result.txt    # real disk write
 user@virtual:~$ cat result.txt
 persisted
 
-user@virtual:~$ ls result.txt                    # 真实磁盘文件确认
+user@virtual:~$ ls result.txt                    # confirmed against the real disk file
 result.txt
 
 user@virtual:~$ exit
 ```
 
-#### MountableFs REPL（多挂载点）
+#### MountableFs REPL (multiple mount points)
 
 ```bash
-# 将多个真实目录挂载到不同虚拟路径
+# Mount multiple real directories at different virtual paths
 java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell \
     --mountable "/mnt/data=./data,/mnt/logs=./logs"
 
-# 每个挂载点使用 ReadWriteFs（写直接触及真实磁盘）
-# 未挂载的路径使用 InMemoryFs（内存）
+# Each mount point uses ReadWriteFs (writes go directly to the real disk)
+# Unmounted paths use InMemoryFs (in-memory)
 ```
 
-**MountableFs REPL 示例：**
+**MountableFs REPL example:**
 
 ```bash
 $ java -jar build/libs/just-bash-kotlin-0.1.0.jar --shell --mountable "/mnt/data=./data"
 
-user@virtual:~$ cat /mnt/data/file.txt        # 读真实磁盘
+user@virtual:~$ cat /mnt/data/file.txt        # read from the real disk
 hello from data
 
-user@virtual:~$ echo "new" > /mnt/data/out.txt  # 写真实磁盘
+user@virtual:~$ echo "new" > /mnt/data/out.txt  # write to the real disk
 user@virtual:~$ cat /mnt/data/out.txt
 new
 
-user@virtual:~$ echo "volatile" > /tmp/volatile.txt  # /tmp 未挂载 → 内存
+user@virtual:~$ echo "volatile" > /tmp/volatile.txt  # /tmp is unmounted → in-memory
 user@virtual:~$ exit
 ```
 
-**三种模式对比：**
+**Comparison of the three modes:**
 
-| 特性 | OverlayFs（默认） | ReadWriteFs（`--readwrite`） | MountableFs（`--mountable`） |
-|------|------------------|---------------------------|---------------------------|
-| 读操作 | 真实文件系统 | 真实文件系统 | 挂载路径：真实磁盘；未挂载：内存 |
-| 写操作 | 内存层（copy-on-write） | 真实磁盘 | 挂载路径：真实磁盘；未挂载：内存 |
-| 持久化 | 否（退出后丢失） | 是 | 挂载路径：是；未挂载：否 |
-| 适用场景 | 安全沙箱、试运行 | 实际文件操作 | 多目录隔离、混合读写 |
+| Feature | OverlayFs (default) | ReadWriteFs (`--readwrite`) | MountableFs (`--mountable`) |
+|---------|---------------------|-----------------------------|-----------------------------|
+| Reads | Real filesystem | Real filesystem | Mounted paths: real disk; unmounted: memory |
+| Writes | Memory layer (copy-on-write) | Real disk | Mounted paths: real disk; unmounted: memory |
+| Persistence | No (lost on exit) | Yes | Mounted paths: yes; unmounted: no |
+| Use cases | Safe sandbox, dry runs | Real file operations | Multi-directory isolation, mixed read/write |
 
-## 目录结构
+## Directory Layout
 
 ```
 src/main/kotlin/com/justbash/
-  ast/          AST 节点类型
-  cli/          CLI 入口（JustBashCli + VirtualShell REPL）
-  commands/     外部命令实现（30+ 命令）
-  encoding/     字节/文本边界助手
-  fs/           虚拟文件系统（InMemoryFs + OverlayFs + ReadWriteFs + MountableFs + Traversal）
-  interpreter/  解释器 + 展开引擎 + 内建命令
-  network/      SecureFetch（URL 白名单 HTTP 客户端）
-  parser/       词法与语法分析（完整 bash 解析器）
-  transform/    AST 序列化 + 变换管道 + 插件
-src/test/kotlin/com/justbash/   Kotlin 单元测试（624 tests）
+  ast/          AST node types
+  cli/          CLI entry point (JustBashCli + VirtualShell REPL)
+  commands/     External command implementations (30+ commands)
+  encoding/     Byte/text boundary helpers
+  fs/           Virtual filesystem (InMemoryFs + OverlayFs + ReadWriteFs + MountableFs + Traversal)
+  interpreter/  Interpreter + expansion engine + builtin commands
+  network/      SecureFetch (URL-allowlisted HTTP client)
+  parser/       Lexing and parsing (complete bash parser)
+  transform/    AST serialization + transform pipeline + plugins
+src/test/kotlin/com/justbash/   Kotlin unit tests (624 tests)
 ```
 
-## 依赖
+## Dependencies
 
-| 依赖 | 用途 |
-|------|------|
-| `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1` | 协程异步（suspend/timeout/AbortSignal） |
-| `io.jawk:jawk:7.1.00` | awk 命令（Jawk 解释器） |
-| `net.thisptr:jackson-jq:1.6.2` | jq 命令（jackson-jq） |
-| `io.github.java-diff-utils:java-diff-utils:4.15` | diff 命令 |
-| `org.yaml:snakeyaml:2.2` | yq 命令（YAML↔JSON 转换） |
-| `org.apache.commons:commons-compress:1.28.0` | tar 命令（压缩/归档） |
+| Dependency | Purpose |
+|------------|---------|
+| `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1` | Coroutine async (suspend/timeout/AbortSignal) |
+| `io.jawk:jawk:7.1.00` | awk command (Jawk interpreter) |
+| `net.thisptr:jackson-jq:1.6.2` | jq command (jackson-jq) |
+| `io.github.java-diff-utils:java-diff-utils:4.15` | diff command |
+| `org.yaml:snakeyaml:2.2` | yq command (YAML↔JSON conversion) |
+| `org.apache.commons:commons-compress:1.28.0` | tar command (compression/archiving) |
 
-## 移植情况
+## Porting Status
 
-详见 `MIGRATION.md`。
+See `MIGRATION.md`.
